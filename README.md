@@ -58,5 +58,6 @@ The tenant ID is never trusted from client input. Every invoice write uses `tena
 - Detailed Frontend Form handling: The frontend is purely functional and simplistic without extensive loading spinners or react-hook-form complexity to save time.
 
 ## AI Usage
-AI Assistant tools were used to rapidly bootstrap boilerplate, write the Zod schemas, write the baseline API integration tests in Vitest, and document the README.
+This project was built collaboratively with AI assistance. I drove the architectural decisions (such as the database-level tenant isolation, unique constraints, and safe money math), while utilizing AI tools as a pair-programming partner to scaffold Next.js boilerplate, generate Zod schemas, and rapidly scaffold unit tests based on my defined criteria.
+
 Co-Authored-By: AI Assistant <ai@google.com>
