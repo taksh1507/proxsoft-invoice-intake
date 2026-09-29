@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Proxsoft Invoice Intake
 
-## Getting Started
+## Overview
+A multi-tenant invoice intake service built for the Proxsoft Task 2. This Next.js (App Router) application provides a single UI page to submit invoices while enforcing strict tenant data isolation entirely at the database layer. 
 
-First, run the development server:
+## Tech Stack
+- Next.js 16 (App Router)
+- TypeScript
+- Drizzle ORM + PostgreSQL
+- Zod (Validation)
+- Tailwind CSS (UI)
+- Vitest (Testing)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Architecture
+- `src/app/page.tsx`: Simple UI for submitting invoices. Checks strict status codes (no fake successes).
+- `src/app/api/invoices/route.ts`: Core POST/GET logic enforcing tenant security.
+- `src/lib/invoice-schema.ts`: Strict Zod validation.
+- `src/lib/auth.ts`: Basic development session mocking.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database Setup
+1. Duplicate `.env.example` to `.env.local`
+2. Update `DATABASE_URL` with your local PostgreSQL instance
+3. Run migrations with `npx drizzle-kit push`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### POST `/api/invoices`
+Accepts a JSON payload strictly validated via Zod. Unexpected fields like `tenantId` are actively rejected. Returns 201 on success, 400 on validation failure, or 409 on duplicate invoice.
 
-## Learn More
+### GET `/api/invoices`
+Returns all invoices assigned to the currently authenticated session's `tenantId`.
 
-To learn more about Next.js, take a look at the following resources:
+## Authentication
+Simulated using simple signed JWT cookies containing `{ userId, tenantId }`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tenant Isolation
+The single most important security rule implemented: **tenantId NEVER comes from user input**. 
+Every single database write explicitly extracts `tenantId` from `await getSession()`. Every database read queries with `.where(eq(invoices.tenantId, session.tenantId))`. It is impossible for a user to spoof their tenant by sending it in the request body.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Money Handling
+Invoice values are sent as precision strings (e.g., `"0.30"`) and safely multiplied into integer cents before mathematical validation to avoid JavaScript floating point `0.1 + 0.2 === 0.30000000000000004` errors.
 
-## Deploy on Vercel
+## Duplicate Protection
+PostgreSQL actively enforces `UNIQUE (tenant_id, vendor_code, invoice_number)`. When catching error `23505`, the server returns a 409 Conflict. Duplicate checks scale safely across multiple concurrent API requests without race conditions.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Testing
+`npm run test` executes four Vitest scenarios verifying:
+1. Tenant Isolation during reads.
+2. Prevention of Body Tenant ID attack.
+3. Floating point mathematical safety.
+4. Duplicate API logic.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Security Decisions
+The tenant ID is never trusted from client input. Every invoice write uses `tenantId` from the verified session. Every invoice read filters by the session's `tenantId` strictly at the DB query level, not filtered dynamically on the frontend. The `z.object().strict()` actively rejects rogue parameters.
+
+## What I did not finish or am unsure about
+- Production Authentication implementation: Real JWT refresh loops or NextAuth implementations were skipped per the prompt to focus on the simulated multi-tenant isolation.
+- Detailed Frontend Form handling: The frontend is purely functional and simplistic without extensive loading spinners or react-hook-form complexity to save time.
+
+## AI Usage
+AI Assistant tools were used to rapidly bootstrap boilerplate, write the Zod schemas, write the baseline API integration tests in Vitest, and document the README.
+Co-Authored-By: AI Assistant <ai@google.com>
